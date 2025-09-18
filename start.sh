@@ -1,35 +1,22 @@
 #!/bin/bash
 
-echo "🚀 Backend Başlatılıyor..."
-echo "=========================="
+echo "🚀 Starting AA-PY Backend Deployment..."
 
-cd /Users/bos/Desktop/AvukatAjanda_Ana_Klasor/avukat-ajanda-backend-py
-
-# Python versiyonunu kontrol et
-echo "Python versiyonu:"
-python3 --version
-
-# Virtual environment oluştur (Python 3.11 veya 3.12 kullan)
-if [ ! -d "venv" ]; then
-    echo "📦 Virtual environment oluşturuluyor..."
-    python3 -m venv venv
+# Check if environment variables are set
+if [ -z "$DATABASE_URL" ]; then
+    echo "❌ DATABASE_URL not set"
+    exit 1
 fi
 
-# Activate virtual environment
-source venv/bin/activate
+if [ -z "$JWT_SECRET" ]; then
+    echo "❌ JWT_SECRET not set"
+    exit 1
+fi
 
-# Upgrade pip
-pip install --upgrade pip
+# Run migrations
+echo "📦 Running database migrations..."
+alembic upgrade head
 
-# Install requirements
-echo "📚 Bağımlılıklar yükleniyor..."
-pip install -r requirements.txt
-
-# Create database file if not exists
-touch avukat.db
-
-# Start backend
-echo "✅ Backend başlatılıyor: http://localhost:8000"
-echo "📖 API Docs: http://localhost:8000/docs"
-echo ""
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# Start the application
+echo "🎯 Starting FastAPI application..."
+uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}

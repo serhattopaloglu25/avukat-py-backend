@@ -1,7 +1,21 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, Float, Text, UniqueConstraint
+"""SQLAlchemy models for the application"""
+
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Enum, UniqueConstraint, Text
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from datetime import datetime
+import enum
 from app.database import Base
+
+class RoleEnum(str, enum.Enum):
+    owner = "owner"
+    admin = "admin"
+    lawyer = "lawyer"
+    assistant = "assistant"
+
+class CaseStatusEnum(str, enum.Enum):
+    active = "active"
+    pending = "pending"
+    closed = "closed"
 
 class User(Base):
     __tablename__ = "users"
@@ -9,11 +23,12 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
-    name = Column(String)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+    name = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    memberships = relationship("Membership", back_populates="user")
+    # Relationships
+    memberships = relationship("Membership", back_populates="user", cascade="all, delete-orphan")
     clients = relationship("Client", back_populates="user")
     cases = relationship("Case", back_populates="user")
     events = relationship("Event", back_populates="user")
@@ -23,9 +38,10 @@ class Org(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime, default=datetime.utcnow)
     
-    memberships = relationship("Membership", back_populates="org")
+    # Relationships
+    memberships = relationship("Membership", back_populates="org", cascade="all, delete-orphan")
     clients = relationship("Client", back_populates="org")
     cases = relationship("Case", back_populates="org")
     events = relationship("Event", back_populates="org")
@@ -34,11 +50,11 @@ class Membership(Base):
     __tablename__ = "memberships"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    org_id = Column(Integer, ForeignKey("orgs.id"), nullable=False)
-    role = Column(String, nullable=False)  # owner, admin, lawyer, assistant
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    org_id = Column(Integer, ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    role = Column(Enum(RoleEnum), default=RoleEnum.lawyer, nullable=False)
     
+    # Relationships
     user = relationship("User", back_populates="memberships")
     org = relationship("Org", back_populates="memberships")
     
@@ -53,12 +69,13 @@ class Client(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     org_id = Column(Integer, ForeignKey("orgs.id"), nullable=False)
     name = Column(String, nullable=False)
-    email = Column(String)
-    phone = Column(String)
-    address = Column(Text)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+    email = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    address = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Relationships
     user = relationship("User", back_populates="clients")
     org = relationship("Org", back_populates="clients")
     cases = relationship("Case", back_populates="client")
@@ -70,13 +87,13 @@ class Case(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     org_id = Column(Integer, ForeignKey("orgs.id"), nullable=False)
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
-    case_no = Column(String, unique=True, nullable=False)
+    case_number = Column(String, unique=True, index=True, nullable=False)
     title = Column(String, nullable=False)
-    description = Column(Text)
-    status = Column(String, default="active")  # active, pending, closed
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+    status = Column(Enum(CaseStatusEnum), default=CaseStatusEnum.active, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Relationships
     user = relationship("User", back_populates="cases")
     org = relationship("Org", back_populates="cases")
     client = relationship("Client", back_populates="cases")
@@ -88,15 +105,15 @@ class Event(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     org_id = Column(Integer, ForeignKey("orgs.id"), nullable=False)
-    case_id = Column(Integer, ForeignKey("cases.id"))
+    case_id = Column(Integer, ForeignKey("cases.id"), nullable=True)
     title = Column(String, nullable=False)
-    type = Column(String)
-    starts_at = Column(DateTime(timezone=True))
-    ends_at = Column(DateTime(timezone=True))
-    location = Column(String)
-    description = Column(Text)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    type = Column(String, nullable=True)
+    starts_at = Column(DateTime, nullable=False)
+    ends_at = Column(DateTime, nullable=True)
+    location = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
     
+    # Relationships
     user = relationship("User", back_populates="events")
     org = relationship("Org", back_populates="events")
     case = relationship("Case", back_populates="events")

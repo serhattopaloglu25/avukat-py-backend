@@ -1,42 +1,41 @@
+"""Statistics routes"""
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
-
+from datetime import datetime
 from app.database import get_db
-from app.models import Client, Case, Event
-from app.schemas import StatsResponse
-from app.deps import get_current_user
+from app import models, schemas
+from app.deps import get_current_user, get_current_org
 
 router = APIRouter()
 
-@router.get("/stats", response_model=StatsResponse)
-async def get_stats(current_user=Depends(get_current_user), db: Session = Depends(get_db)):
-    if not current_user.current_org_id:
-        return {
-            "total_clients": 0,
-            "total_cases": 0, 
-            "active_cases": 0,
-            "upcoming_events": 0
-        }
-    
-    total_clients = db.query(Client).filter(
-        Client.org_id == current_user.current_org_id
+@router.get("/", response_model=schemas.StatsResponse)
+async def get_stats(
+    current_user = Depends(get_current_user),
+    current_org = Depends(get_current_org),
+    db: Session = Depends(get_db)
+):
+    """Get statistics for the current organization"""
+    # Count total clients
+    total_clients = db.query(models.Client).filter(
+        models.Client.org_id == current_org.id
     ).count()
     
-    total_cases = db.query(Case).filter(
-        Case.org_id == current_user.current_org_id
+    # Count total cases
+    total_cases = db.query(models.Case).filter(
+        models.Case.org_id == current_org.id
     ).count()
     
-    active_cases = db.query(Case).filter(
-        Case.org_id == current_user.current_org_id,
-        Case.status == "active"
+    # Count active cases
+    active_cases = db.query(models.Case).filter(
+        models.Case.org_id == current_org.id,
+        models.Case.status == models.CaseStatusEnum.active
     ).count()
     
-    # Upcoming events (next 30 days)
-    upcoming_events = db.query(Event).filter(
-        Event.org_id == current_user.current_org_id,
-        Event.starts_at >= datetime.now(),
-        Event.starts_at <= datetime.now() + timedelta(days=30)
+    # Count upcoming events
+    upcoming_events = db.query(models.Event).filter(
+        models.Event.org_id == current_org.id,
+        models.Event.starts_at >= datetime.utcnow()
     ).count()
     
     return {
@@ -45,8 +44,3 @@ async def get_stats(current_user=Depends(get_current_user), db: Session = Depend
         "active_cases": active_cases,
         "upcoming_events": upcoming_events
     }
-
-@router.get("/dashboard/stats")
-async def dashboard_stats(current_user=Depends(get_current_user), db: Session = Depends(get_db)):
-    """Alias for stats endpoint"""
-    return await get_stats(current_user, db)

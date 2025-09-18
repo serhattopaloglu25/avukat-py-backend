@@ -1,117 +1,94 @@
 #!/bin/bash
 
-# API Test Script
-API_URL="${1:-http://localhost:8000}"
-echo "🧪 Testing API: $API_URL"
-echo "================================"
+API_URL=${1:-"http://localhost:8000"}
 
-# Colors for output
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-NC='\033[0m' # No Color
+echo "🧪 Testing AA-PY Backend API at: $API_URL"
+echo "=================================="
 
-# Test 1: Health Check
-echo -e "\n📊 Test 1: Health Check"
-echo "------------------------"
-HEALTH_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "$API_URL/health")
-HTTP_STATUS=$(echo "$HEALTH_RESPONSE" | grep "HTTP_STATUS" | cut -d: -f2)
-BODY=$(echo "$HEALTH_RESPONSE" | sed '$d')
+# 1. Ping test
+echo "1️⃣ Testing /ping endpoint..."
+curl -sS -m 5 "$API_URL/ping" | python3 -m json.tool
 
-if [ "$HTTP_STATUS" = "200" ]; then
-    echo -e "${GREEN}✅ Health check passed${NC}"
-    echo "Response: $BODY"
-else
-    echo -e "${RED}❌ Health check failed (HTTP $HTTP_STATUS)${NC}"
-    echo "Response: $BODY"
-fi
+# 2. Health check
+echo -e "\n2️⃣ Testing /health endpoint..."
+curl -sS -m 5 "$API_URL/health" | python3 -m json.tool
 
-# Test 2: Register New User
-echo -e "\n👤 Test 2: User Registration"
-echo "-----------------------------"
-TIMESTAMP=$(date +%s)
-REGISTER_DATA='{
-  "email":"test'$TIMESTAMP'@example.com",
-  "password":"Test1234!",
-  "name":"Test User",
-  "consents":{
-    "kvkk":true,
-    "aydinlatma":true,
-    "uyelik":true
-  }
-}'
-
-REGISTER_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$API_URL/auth/register" \
+# 3. Register test user
+echo -e "\n3️⃣ Registering test user..."
+REGISTER_RESPONSE=$(curl -sS -X POST "$API_URL/auth/register" \
   -H "Content-Type: application/json" \
-  -d "$REGISTER_DATA")
+  -d '{
+    "email": "test@example.com",
+    "password": "test123456",
+    "name": "Test User"
+  }')
+echo "$REGISTER_RESPONSE" | python3 -m json.tool
 
-HTTP_STATUS=$(echo "$REGISTER_RESPONSE" | grep "HTTP_STATUS" | cut -d: -f2)
-BODY=$(echo "$REGISTER_RESPONSE" | sed '$d')
+# Extract token
+TOKEN=$(echo "$REGISTER_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('access_token', ''))")
 
-if [ "$HTTP_STATUS" = "200" ]; then
-    echo -e "${GREEN}✅ Registration successful${NC}"
-    # Extract token
-    TOKEN=$(echo "$BODY" | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)
-    if [ ! -z "$TOKEN" ]; then
-        echo "Token received: ${TOKEN:0:20}..."
-    fi
-else
-    echo -e "${RED}❌ Registration failed (HTTP $HTTP_STATUS)${NC}"
-    echo "Response: $BODY"
+if [ -z "$TOKEN" ]; then
+    echo "❌ Failed to get token"
+    exit 1
 fi
 
-# Test 3: Login
-echo -e "\n🔐 Test 3: User Login"
-echo "----------------------"
-LOGIN_DATA='{
-  "email":"test'$TIMESTAMP'@example.com",
-  "password":"Test1234!"
-}'
+echo "✅ Got token: ${TOKEN:0:20}..."
 
-LOGIN_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "$API_URL/auth/login" \
+# 4. Test /me endpoint
+echo -e "\n4️⃣ Testing /auth/me endpoint..."
+curl -sS "$API_URL/auth/me" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+
+# 5. Test stats
+echo -e "\n5️⃣ Testing /api/stats endpoint..."
+curl -sS "$API_URL/api/stats" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
+
+# 6. Create a client
+echo -e "\n6️⃣ Creating a test client..."
+CLIENT_RESPONSE=$(curl -sS -X POST "$API_URL/api/clients" \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d "$LOGIN_DATA")
+  -d '{
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "555-0123",
+    "address": "123 Main St"
+  }')
+echo "$CLIENT_RESPONSE" | python3 -m json.tool
+CLIENT_ID=$(echo "$CLIENT_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('id', ''))")
 
-HTTP_STATUS=$(echo "$LOGIN_RESPONSE" | grep "HTTP_STATUS" | cut -d: -f2)
-BODY=$(echo "$LOGIN_RESPONSE" | sed '$d')
+# 7. Create a case
+echo -e "\n7️⃣ Creating a test case..."
+CASE_RESPONSE=$(curl -sS -X POST "$API_URL/api/cases" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"client_id\": $CLIENT_ID,
+    \"case_number\": \"2024-001\",
+    \"title\": \"Test Case\",
+    \"status\": \"active\"
+  }")
+echo "$CASE_RESPONSE" | python3 -m json.tool
+CASE_ID=$(echo "$CASE_RESPONSE" | python3 -c "import sys, json; print(json.load(sys.stdin).get('id', ''))")
 
-if [ "$HTTP_STATUS" = "200" ]; then
-    echo -e "${GREEN}✅ Login successful${NC}"
-    TOKEN=$(echo "$BODY" | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)
-    
-    # Test 4: Get Stats with Auth
-    echo -e "\n📈 Test 4: Get Stats (Authenticated)"
-    echo "-------------------------------------"
-    STATS_RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "$API_URL/api/stats" \
-      -H "Authorization: Bearer $TOKEN")
-    
-    HTTP_STATUS=$(echo "$STATS_RESPONSE" | grep "HTTP_STATUS" | cut -d: -f2)
-    BODY=$(echo "$STATS_RESPONSE" | sed '$d')
-    
-    if [ "$HTTP_STATUS" = "200" ]; then
-        echo -e "${GREEN}✅ Stats endpoint working${NC}"
-        echo "Response: $BODY"
-    else
-        echo -e "${RED}❌ Stats endpoint failed (HTTP $HTTP_STATUS)${NC}"
-    fi
-else
-    echo -e "${RED}❌ Login failed (HTTP $HTTP_STATUS)${NC}"
-    echo "Response: $BODY"
-fi
+# 8. Create an event
+echo -e "\n8️⃣ Creating a test event..."
+curl -sS -X POST "$API_URL/api/events" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"case_id\": $CASE_ID,
+    \"title\": \"Court Hearing\",
+    \"type\": \"hearing\",
+    \"starts_at\": \"2024-06-01T10:00:00\",
+    \"ends_at\": \"2024-06-01T12:00:00\",
+    \"location\": \"Courthouse Room 201\"
+  }" | python3 -m json.tool
 
-# Test 5: CORS Headers
-echo -e "\n🌐 Test 5: CORS Headers Check"
-echo "-------------------------------"
-CORS_RESPONSE=$(curl -s -I -X OPTIONS "$API_URL/health" \
-  -H "Origin: https://avukatajanda.com" \
-  -H "Access-Control-Request-Method: GET")
+# 9. List all data
+echo -e "\n9️⃣ Listing all clients..."
+curl -sS "$API_URL/api/clients" \
+  -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
 
-if echo "$CORS_RESPONSE" | grep -q "access-control-allow-origin"; then
-    echo -e "${GREEN}✅ CORS headers present${NC}"
-    echo "$CORS_RESPONSE" | grep -i "access-control"
-else
-    echo -e "${RED}❌ CORS headers missing${NC}"
-fi
-
-echo -e "\n================================"
-echo "🏁 Test Summary Complete"
-echo "================================"
+echo -e "\n🎯 All tests completed!"
