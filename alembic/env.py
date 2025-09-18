@@ -1,67 +1,46 @@
-"""Alembic environment configuration"""
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 from alembic import context
 import os
 import sys
 from pathlib import Path
-from dotenv import load_dotenv
 
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-# Load environment variables
-load_dotenv()
+from app.database import Base
+from app.models import *  # Import all models
 
-# Import your models' Base
-from app.db import Base
-from app.models import User, Organization, Client, Case, Event, UserConsent
-
-# this is the Alembic Config object
 config = context.config
 
-# Interpret the config file for Python logging
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+# Get DATABASE_URL from environment
+database_url = os.getenv("DATABASE_URL")
+if database_url and database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
 
-# Add your model's MetaData object here for 'autogenerate' support
+config.set_main_option("sqlalchemy.url", database_url or "")
+
 target_metadata = Base.metadata
 
-# Get database URL from environment
-def get_url():
-    return os.getenv("DATABASE_URL", "postgresql://user:pass@localhost/avukatajanda")
-
-def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode."""
-    url = get_url()
+def run_migrations_offline():
+    url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
-
     with context.begin_transaction():
         context.run_migrations()
 
-def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
-    configuration = config.get_section(config.config_ini_section)
-    configuration['sqlalchemy.url'] = get_url()
-    
+def run_migrations_online():
     connectable = engine_from_config(
-        configuration,
+        config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
-
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, 
-            target_metadata=target_metadata
-        )
-
+        context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
             context.run_migrations()
 
