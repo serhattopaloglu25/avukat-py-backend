@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
 # Auth Schemas
@@ -25,8 +25,8 @@ class UserBase(BaseModel):
 
 class UserResponse(UserBase):
     id: int
-    role: str
-    createdAt: datetime
+    role: Optional[str] = None
+    created_at: datetime
     
     class Config:
         from_attributes = True
@@ -38,41 +38,71 @@ class ClientCreate(BaseModel):
     phone: Optional[str] = None
     address: Optional[str] = None
 
+class ClientUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+
 class ClientResponse(ClientCreate):
     id: int
-    userId: int
-    createdAt: datetime
+    user_id: int
+    org_id: int
+    created_at: datetime
+    updated_at: datetime
     
     class Config:
         from_attributes = True
 
 # Case Schemas
 class CaseCreate(BaseModel):
+    client_id: int
+    case_no: str
     title: str
-    clientId: int
-    caseNumber: Optional[str] = None
     description: Optional[str] = None
     status: Optional[str] = "active"
 
+class CaseUpdate(BaseModel):
+    client_id: Optional[int] = None
+    case_no: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+
 class CaseResponse(CaseCreate):
     id: int
-    userId: int
-    createdAt: datetime
+    user_id: int
+    org_id: int
+    created_at: datetime
+    updated_at: datetime
     
     class Config:
         from_attributes = True
 
 # Event Schemas
 class EventCreate(BaseModel):
+    case_id: Optional[int] = None
     title: str
-    caseId: int
+    type: Optional[str] = None
+    starts_at: Optional[datetime] = None
+    ends_at: Optional[datetime] = None
+    location: Optional[str] = None
     description: Optional[str] = None
-    eventDate: Optional[datetime] = None
-    eventType: Optional[str] = None
+
+class EventUpdate(BaseModel):
+    case_id: Optional[int] = None
+    title: Optional[str] = None
+    type: Optional[str] = None
+    starts_at: Optional[datetime] = None
+    ends_at: Optional[datetime] = None
+    location: Optional[str] = None
+    description: Optional[str] = None
 
 class EventResponse(EventCreate):
     id: int
-    createdAt: datetime
+    user_id: int
+    org_id: int
+    created_at: datetime
     
     class Config:
         from_attributes = True

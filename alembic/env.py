@@ -5,30 +5,24 @@ import os
 import sys
 from pathlib import Path
 
-# Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from app.database import Base
-from app.models import *  # Import all models
+from app.models import *
 
 config = context.config
 
-# Get DATABASE_URL from environment
-database_url = os.getenv("DATABASE_URL")
-if database_url and database_url.startswith("postgres://"):
+database_url = os.getenv("DATABASE_URL", "")
+if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
-config.set_main_option("sqlalchemy.url", database_url or "")
-
+config.set_main_option("sqlalchemy.url", database_url)
 target_metadata = Base.metadata
 
 def run_migrations_offline():
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url,
-        target_metadata=target_metadata,
-        literal_binds=True,
-        dialect_opts={"paramstyle": "named"},
+        url=url, target_metadata=target_metadata, literal_binds=True
     )
     with context.begin_transaction():
         context.run_migrations()
