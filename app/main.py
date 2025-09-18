@@ -42,8 +42,9 @@ async def health():
     try:
         # DB check with timeout
         from app.database import SessionLocal
+        from sqlalchemy import text
         db = SessionLocal()
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db.close()
         return {"status": "healthy", "db": "connected"}
     except Exception as e:
