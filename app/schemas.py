@@ -1,9 +1,16 @@
 """Pydantic schemas for request/response models"""
 
-from pydantic import BaseModel, EmailStr, Field
-from datetime import datetime
+from pydantic import BaseModel, Field
 from typing import Optional, List
+from datetime import datetime
 from enum import Enum
+
+# Email validation
+try:
+    from pydantic import EmailStr
+except ImportError:
+    EmailStr = str
+
 
 class RoleEnum(str, Enum):
     owner = "owner"
